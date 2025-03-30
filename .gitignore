@@ -5,3 +5,12 @@ __pycache__
 data/*.npz
 data/*.pkl
 checkpoint/*
+data/3dhp
+data/h36m
+data/humaneva
+.hb_check
+.fast_perf
+hb_perf_result
+model_output
+*.log
+*.onnx
