@@ -30,7 +30,7 @@ class Data:
         # load 2D
         dataset_path_2d = self.data_config['GT_2D']
         self.load_pixel_2d_pose(dataset_path_2d)
-        self.file_names = self.load_view(dataset_path_2d, self.data_config['FRAME_PATH'])
+        # self.file_names = self.load_view(dataset_path_2d, self.data_config['FRAME_PATH'])
 
         if self.data_config['INTRINSIC_ENCODING']:
             self.calculate_intrinsic_2d_pose()
