@@ -10,8 +10,8 @@ data_config = {
     'TRAIN_SUBJECTS': 'S1,S5,S6,S7,S8',
     'TEST_SUBJECTS': 'S9,S11',
 
-    'GT_3D': '/ssd/yzhan/data/benchmark/3D/h36m/VideoPose3D/data/data_3d_h36m.npz',
-    'GT_2D': '/ssd/yzhan/data/benchmark/3D/h36m/VideoPose3D/data/data_2d_h36m_gt.npz',
+    'GT_3D': 'data/h36m/data_3d_h36m.npz',
+    'GT_2D': 'data/h36m/data_2d_h36m_gt.npz',
     'CAMERA_PARAM': '',
 
     # reduce dataset size by fraction
