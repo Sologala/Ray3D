@@ -9,7 +9,8 @@ class Model(object):
         trj_model = None
 
         if model_config['MODEL'] == 'VideoPose3D':
-            from lib.model.videopose3D import TemporalModel, TemporalModelOptimized1f
+            # from lib.model.videopose3D import TemporalModel, TemporalModelOptimized1f
+            from lib.model.videoOri import TemporalModel, TemporalModelOptimized1f
 
             filter_widths = [int(x) for x in model_config['ARCHITECTURE'].split(',')]
 

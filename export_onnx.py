@@ -7,7 +7,7 @@ import torch.optim as optim
 
 from lib.model import Model
 from lib.dataset import Data
-from lib.utils.utils import init_config, load_weight
+from lib.utils.utils import init_config
 from lib.train_val.trainer import Trainer
 from lib.dataloader.generators import ChunkedGenerator, UnchunkedGenerator
 from lib.visualization.plotter import ExperimentPlotter
@@ -117,19 +117,18 @@ def main():
     }
 
     # 定义输入示例，需要根据实际输入调整
-    dummy_input = torch.randn(1, 9, 17, 3)
-    dummy_param = torch.randn(1, 2)
+    dummy_input = torch.randn(1, 9, 17, 2)
 
-    onnx_path = "pos_neg.onnx"
+    onnx_path = "ori_est.onnx"
     torch.onnx.export(
         models["train_trj"].module.cpu(),
-        (dummy_input,dummy_param),
+        dummy_input,
         onnx_path,
         export_params=True,
         opset_version=11,
         do_constant_folding=True,
-        input_names=["rays", "cams"],
-        output_names=["output"],
+        input_names=["kps"],
+        output_names=["ang"],
     )
 
     return 0;

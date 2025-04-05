@@ -32,7 +32,36 @@ class TemporalModelBase(nn.Module):
 
         self.pad = [filter_widths[0] // 2]
         self.expand_bn = nn.BatchNorm2d(channels, momentum=0.1)
-        self.shrink = nn.Conv2d(channels, num_joints_out * 3, 1)
+        # self.shrink = nn.Conv2d(channels, num_joints_out * 3, 1)
+        self.num_classes = 8
+
+        self.coarse_classifier = nn.Sequential(
+            nn.Flatten(), nn.Linear(1024, 256), nn.ReLU(), nn.Linear(256, self.num_classes)
+        )
+        self.fine_regressor = nn.Sequential(
+            nn.Flatten(),
+            nn.Linear(1024 + self.num_classes, 256),
+            nn.ReLU(),
+            nn.Linear(256, 1),
+            nn.Tanh(),
+        )
+
+    def cls_and_reg(self, x):
+        coarse_logits = self.coarse_classifier(x)
+        coarse_probs = torch.softmax(coarse_logits, dim=1)
+
+        # 将粗分类的概率与输入特征拼接
+        combined_features = torch.cat([x.view(x.size(0), -1), coarse_probs], dim=1)
+
+        # 细回归
+        fine_angle = self.fine_regressor(combined_features)
+
+        # 将细回归的输出映射到具体的角度范围
+        class_width = 360 / self.num_classes
+        coarse_angle = torch.argmax(coarse_probs, dim=1, keepdim=True).float() * class_width
+        final_angle = coarse_angle + fine_angle * (class_width / 2)
+
+        return final_angle
 
     def set_bn_momentum(self, momentum):
         self.expand_bn.momentum = momentum
@@ -62,6 +91,10 @@ class TemporalModelBase(nn.Module):
         return frames
 
     def forward(self, x):
+        print(x.shape)
+        print(self.in_features)
+        print(self.num_joints_in)
+
         assert len(x.shape) == 4
         assert x.shape[-2] == self.num_joints_in
         assert x.shape[-1] == self.in_features
@@ -73,11 +106,8 @@ class TemporalModelBase(nn.Module):
         x = x.unsqueeze(-1)
 
         x = self._forward_blocks(x)
-
-        x = x.permute(0, 2, 3, 1)
-        x = x.view(sz[0], -1, self.num_joints_out, 3)
-
-        return x
+        ang = self.cls_and_reg(x)
+        return ang
 
 
 class TemporalModel(TemporalModelBase):
@@ -152,7 +182,6 @@ class TemporalModel(TemporalModelBase):
             x = self.drop(self.relu(self.layers_bn[2 * i](self.layers_conv[2 * i](x))))
             x = res + self.drop(self.relu(self.layers_bn[2 * i + 1](self.layers_conv[2 * i + 1](x))))
 
-        x = self.shrink(x)
         return x
 
 
@@ -209,6 +238,7 @@ class TemporalModelOptimized1f(TemporalModelBase):
         self.layers_bn = nn.ModuleList(layers_bn)
 
     def _forward_blocks(self, x):
+
         x = self.drop(self.relu(self.expand_bn(self.expand_conv(x))))
 
         for i in range(len(self.pad) - 1):
@@ -217,7 +247,6 @@ class TemporalModelOptimized1f(TemporalModelBase):
             x = self.drop(self.relu(self.layers_bn[2 * i](self.layers_conv[2 * i](x))))
             x = res + self.drop(self.relu(self.layers_bn[2 * i + 1](self.layers_conv[2 * i + 1](x))))
 
-        x = self.shrink(x)
         return x
 
 
@@ -227,10 +256,10 @@ if __name__ == "__main__":
     num_joints = 17
     filter_widths = [3, 3, 3, 3]
 
-    model_pos_train = TemporalModel(17, 2, num_joints, filter_widths=filter_widths)
+    model = TemporalModel(17, 2, num_joints, filter_widths=filter_widths)
 
     input = torch.randn([512, receptive_field, 17, 2])
-    y = model_pos_train(input)
+    y = model(input)
     end = time.time()
     print(end - start)
     print(y.shape)
