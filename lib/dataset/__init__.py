@@ -24,6 +24,8 @@ class Data:
         self.load_world_3d_pose(dataset_path_3d)
         if self.data_config["RAY_ENCODING"]:
             self.calculate_ray_3d_pose()
+        elif self.data_config["ORI_ENCODING"]:
+            self.calculate_target_ori()
         else:
             self.calculate_camera_3d_pose()
 
@@ -88,6 +90,22 @@ class Data:
                         anim["positions_3d"] = positions_3d
 
     def calculate_ray_3d_pose(self):
+        """
+        convert 3D pose from world to intermediate space
+        :return:
+        """
+        if self.gt_eval:
+            for subject in self.dataset.subjects():
+                for action in self.dataset[subject].keys():
+                    anim = self.dataset[subject][action]
+                    if "positions" in anim:
+                        positions_3d = []
+                        for cam_idx, camera in enumerate(self.dataset.camera_info[subject]):
+                            camera = self.dataset.camera_info[subject][cam_idx]
+                            positions_3d.append(camera.world2normalized(anim["positions"]))
+                        anim["positions_3d"] = positions_3d
+
+    def calculate_target_ori(self):
         """
         convert 3D pose from world to intermediate space
         :return:
