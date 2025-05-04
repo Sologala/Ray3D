@@ -1,5 +1,3 @@
-
-
 import numpy as np
 
 
@@ -122,11 +120,23 @@ class Human36mSkeleton(Skeleton):
     def __init__(self, parents, joints_left, joints_right):
         super().__init__(parents, joints_left, joints_right)
 
-        self.kpt_name = ['mid_hip',
-                          'right_hip', 'right_knee', 'right_ankle',
-                          'left_hip', 'left_knee', 'left_ankle',
-                          'mid_spine', 'neck', 'chin', 'head',
-                          'left_shoulder', 'left_elbow', 'left_wrist',
-                          'right_shoulder', 'right_elbow', 'right_wrist',
-                          ]
-        self.kpt_idx = [0, 1, 2, 3, 4, 5, 6, 7,  8,  9,  10, 11, 12, 13, 14, 15, 16]
+        self.kpt_name = [
+            "mid_hip",
+            "right_hip",
+            "right_knee",
+            "right_ankle",
+            "left_hip",
+            "left_knee",
+            "left_ankle",
+            "mid_spine",
+            "neck",
+            "chin",
+            "head",
+            "left_shoulder",
+            "left_elbow",
+            "left_wrist",
+            "right_shoulder",
+            "right_elbow",
+            "right_wrist",
+        ]
+        self.kpt_idx = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16]

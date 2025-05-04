@@ -5,6 +5,7 @@
 # LICENSE file in the root directory of this source tree.
 #
 
+
 class MocapDataset:
     def __init__(self, fps, skeleton):
         self._skeleton = skeleton
@@ -17,8 +18,8 @@ class MocapDataset:
         for subject in self._data.keys():
             for action in self._data[subject].keys():
                 s = self._data[subject][action]
-                if 'positions' in s:
-                    s['positions'] = s['positions'][:, kept_joints]
+                if "positions" in s:
+                    s["positions"] = s["positions"][:, kept_joints]
 
     def __getitem__(self, key):
         return self._data[key]

@@ -1,6 +1,3 @@
-
-
-
 import cv2
 import math
 import torch
@@ -60,7 +57,7 @@ def rotation2quaternion(rot):
     assert rot.shape == (3, 3)
     quaternion = np.zeros(4)
     trace = np.trace(rot)
-    if trace > 0.:
+    if trace > 0.0:
         s = np.sqrt(trace + 1)
         quaternion[3] = s * 0.5
         s = 0.5 / s
@@ -73,7 +70,7 @@ def rotation2quaternion(rot):
         j = (i + 1) % 3
         k = (i + 2) % 3
 
-        s = np.sqrt(rot[i, i] - rot[j, j] - rot[k, k] + 1.)
+        s = np.sqrt(rot[i, i] - rot[j, j] - rot[k, k] + 1.0)
         quaternion[i] = s * 0.5
         s = 0.5 / s
         quaternion[3] = (rot[k, j] - rot[j, k]) * s
@@ -101,7 +98,7 @@ def quaternion2rotation(quat):
     :param quat: numpy array with shape of (4, )
     :return: numpy array with shape of (3, 3)
     """
-    assert quat.shape == (4, )
+    assert quat.shape == (4,)
     rot = np.zeros((3, 3))
 
     x = quat[0]
@@ -122,9 +119,9 @@ def quaternion2rotation(quat):
     wy = ty * w
     wz = tz * w
 
-    rot[0, 0] = 1. - (yy + zz)
-    rot[1, 1] = 1. - (xx + zz)
-    rot[2, 2] = 1. - (xx + yy)
+    rot[0, 0] = 1.0 - (yy + zz)
+    rot[1, 1] = 1.0 - (xx + zz)
+    rot[2, 2] = 1.0 - (xx + yy)
     rot[1, 0] = xy + wz
     rot[0, 1] = xy - wz
     rot[2, 0] = xz - wy
@@ -166,11 +163,13 @@ def homogenous2catesian(arr_hom):
     :return:
     """
     if isinstance(arr_hom, np.ndarray):
-        arr_hom[..., :-1] /= np.repeat(arr_hom[..., -1:], arr_hom.shape[-1]-1, axis=-1)
+        arr_hom[..., :-1] /= np.repeat(arr_hom[..., -1:], arr_hom.shape[-1] - 1, axis=-1)
         arr_cart = arr_hom[..., :-1]
     else:
         org_dim = arr_hom.shape
-        new_dim = [1 for _ in org_dim[:-1]] + [org_dim[-1] -1,]
+        new_dim = [1 for _ in org_dim[:-1]] + [
+            org_dim[-1] - 1,
+        ]
         arr_hom[..., :-1] = arr_hom[..., :-1] / arr_hom[..., -1:].repeat(*new_dim)
         arr_cart = arr_hom[..., :-1]
     return arr_cart
@@ -207,8 +206,19 @@ def angle(v1, v2):
 
 class CameraInfoPacket(object):
 
-    def __init__(self, P=None, K=None, R=None, t=None, dist_coeff=None,
-                 res_w=None, res_h=None, azimuth=None, undistort=True, lite=False):
+    def __init__(
+        self,
+        P=None,
+        K=None,
+        R=None,
+        t=None,
+        dist_coeff=None,
+        res_w=None,
+        res_h=None,
+        azimuth=None,
+        undistort=True,
+        lite=False,
+    ):
         """
         P = K[R|t]
         One must either supply P or K, R, t.
@@ -236,7 +246,9 @@ class CameraInfoPacket(object):
         if lite:
             return
 
-        self.dist_coeff = dist_coeff.astype(np.float64) if dist_coeff is not None else None # radial distortion and tangential distortion
+        self.dist_coeff = (
+            dist_coeff.astype(np.float64) if dist_coeff is not None else None
+        )  # radial distortion and tangential distortion
         self.res_w = res_w
         self.res_h = res_h
         self.azimuth = azimuth
@@ -244,7 +256,7 @@ class CameraInfoPacket(object):
 
         self.Rw2c = R.astype(np.float64)  # rotation matrix from world to cam
         self.Tw2c = t.astype(np.float64)  # translation vector, the position of the origin of the world coordinate
-                                          # system expressed in coordinates of the camera-centered coordinate system
+        # system expressed in coordinates of the camera-centered coordinate system
         self.Rc2w = self.Rw2c.T
         self.Tc2w = -self.Rw2c.T @ self.Tw2c
 
@@ -338,7 +350,7 @@ class CameraInfoPacket(object):
         Rc2n = Rc2n.astype(np.float64)
 
         Tc2n = np.zeros((3, 1)).astype(np.float64)
-        err_str = 'camera height should be larger than 0 if the world coordinate system is set up on the ground'
+        err_str = "camera height should be larger than 0 if the world coordinate system is set up on the ground"
         assert self.cam_orig_world[2] > 0, err_str
         Tc2n[1] = -self.cam_orig_world[2]
 
@@ -353,7 +365,9 @@ class CameraInfoPacket(object):
         if isinstance(pt, np.ndarray):
             return pt @ self.Rc2w.T + self.Tc2w.T
         else:
-            return pt @ torch.from_numpy(self.Rc2w.T).float().to(pt.device) + torch.from_numpy(self.Tc2w.T).float().to(pt.device)
+            return pt @ torch.from_numpy(self.Rc2w.T).float().to(pt.device) + torch.from_numpy(self.Tc2w.T).float().to(
+                pt.device
+            )
 
     def world2camera(self, pt):
         """
@@ -363,7 +377,9 @@ class CameraInfoPacket(object):
         if isinstance(pt, np.ndarray):
             return pt @ self.Rw2c.T + self.Tw2c.T
         else:
-            return pt @ torch.from_numpy(self.Rw2c.T).float().to(pt.device) + torch.from_numpy(self.Tw2c.T).float().to(pt.device)
+            return pt @ torch.from_numpy(self.Rw2c.T).float().to(pt.device) + torch.from_numpy(self.Tw2c.T).float().to(
+                pt.device
+            )
 
     def camera2normalized(self, pt):
         """
@@ -374,7 +390,9 @@ class CameraInfoPacket(object):
         if isinstance(pt, np.ndarray):
             return pt @ self.Rc2n.T + self.Tc2n.T
         else:
-            return pt @ torch.from_numpy(self.Rc2n.T).float().to(pt.device) + torch.from_numpy(self.Tc2n.T).float().to(pt.device)
+            return pt @ torch.from_numpy(self.Rc2n.T).float().to(pt.device) + torch.from_numpy(self.Tc2n.T).float().to(
+                pt.device
+            )
 
     def normalized2camera(self, pt):
         """
@@ -385,7 +403,9 @@ class CameraInfoPacket(object):
         if isinstance(pt, np.ndarray):
             return pt @ self.Rn2c.T + self.Tn2c.T
         else:
-            return pt @ torch.from_numpy(self.Rn2c.T).float().to(pt.device) + torch.from_numpy(self.Tn2c.T).float().to(pt.device)
+            return pt @ torch.from_numpy(self.Rn2c.T).float().to(pt.device) + torch.from_numpy(self.Tn2c.T).float().to(
+                pt.device
+            )
 
     def world2normalized(self, pt):
         """
@@ -396,7 +416,9 @@ class CameraInfoPacket(object):
         if isinstance(pt, np.ndarray):
             return pt @ self.Rw2n.T + self.Tw2n.T
         else:
-            return pt @ torch.from_numpy(self.Rw2n.T).float().to(pt.device) + torch.from_numpy(self.Tw2n.T).float().to(pt.device)
+            return pt @ torch.from_numpy(self.Rw2n.T).float().to(pt.device) + torch.from_numpy(self.Tw2n.T).float().to(
+                pt.device
+            )
 
     def normalized2world(self, pt):
         """
@@ -407,7 +429,9 @@ class CameraInfoPacket(object):
         if isinstance(pt, np.ndarray):
             return pt @ self.Rn2w.T + self.Tn2w.T
         else:
-            return pt @ torch.from_numpy(self.Rn2w.T).float().to(pt.device) + torch.from_numpy(self.Tn2w.T).float().to(pt.device)
+            return pt @ torch.from_numpy(self.Rn2w.T).float().to(pt.device) + torch.from_numpy(self.Tn2w.T).float().to(
+                pt.device
+            )
 
     def undistort_point(self, points2d):
         """
@@ -497,7 +521,7 @@ class CameraInfoPacket(object):
         else:
             x = X @ torch.from_numpy(self.P.T).float().to(X.device)
             org_dim = x.shape
-            new_dim = [item for item in org_dim[:-1]] + [org_dim[-1]-1]
+            new_dim = [item for item in org_dim[:-1]] + [org_dim[-1] - 1]
             ret = torch.zeros(*new_dim).to(x.device)
             ret[..., 0] = x[..., 0] / x[..., 2]
             ret[..., 1] = x[..., 1] / x[..., 2]

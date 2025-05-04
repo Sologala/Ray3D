@@ -40,8 +40,8 @@ def p_mpjpe(predicted, target):
     X0 = target - muX
     Y0 = predicted - muY
 
-    normX = np.sqrt(np.sum(X0 ** 2, axis=(1, 2), keepdims=True))
-    normY = np.sqrt(np.sum(Y0 ** 2, axis=(1, 2), keepdims=True))
+    normX = np.sqrt(np.sum(X0**2, axis=(1, 2), keepdims=True))
+    normY = np.sqrt(np.sum(Y0**2, axis=(1, 2), keepdims=True))
 
     X0 /= normX
     Y0 /= normY
@@ -76,7 +76,7 @@ def n_mpjpe(predicted, target):
     """
     assert predicted.shape == target.shape
 
-    norm_predicted = torch.mean(torch.sum(predicted ** 2, dim=3, keepdim=True), dim=2, keepdim=True)
+    norm_predicted = torch.mean(torch.sum(predicted**2, dim=3, keepdim=True), dim=2, keepdim=True)
     norm_target = torch.mean(torch.sum(target * predicted, dim=3, keepdim=True), dim=2, keepdim=True)
     scale = norm_target / norm_predicted
     return mpjpe(scale * predicted, target)
