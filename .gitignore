@@ -14,3 +14,4 @@ hb_perf_result
 model_output
 *.log
 *.onnx
+./checkpoint/*
