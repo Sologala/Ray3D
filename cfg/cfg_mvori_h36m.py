@@ -20,9 +20,11 @@ data_config = {
     "ACTIONS": "*",
     "REMOVE_IRRELEVANT_KPTS": False,
     "FRAME_PATH": "/ssd/yzhan/data/benchmark/3D/showroom/20210702/frame/",
-    "INTRINSIC_ENCODING": False,
-    "RAY_ENCODING": False,
+    # 3d encoding
     "ORI_ENCODING": True,
+    # 2d encoding
+    "INTRINSIC_ENCODING": True,  # 将点lift到像平面进行编码 , 作用于data.keypoints
+    "RAY_ENCODING": True,
     "ADD_HEIGHT": False,
 }
 

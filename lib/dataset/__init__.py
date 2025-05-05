@@ -3,6 +3,7 @@ import copy
 import numpy as np
 from lib.utils.utils import deterministic_random
 from lib.camera.camera import normalize_screen_coordinates
+from lib.utils.keypoint_format_convert import H36M_KEYPOINTS
 
 
 class Data:
@@ -22,12 +23,11 @@ class Data:
         # load 3D
         dataset_path_3d = self.data_config["GT_3D"]
         self.load_world_3d_pose(dataset_path_3d)
-        if self.data_config["RAY_ENCODING"]:
-            self.calculate_ray_3d_pose()
-        elif self.data_config["ORI_ENCODING"]:
-            self.calculate_target_ori()
-        else:
-            self.calculate_camera_3d_pose()
+        # if self.data_config["RAY_ENCODING"]:
+        #     self.calculate_ray_3d_pose()
+
+        # 默认计算相机系下的3d点
+        self.calculate_camera_3d_pose()
 
         # load 2D
         dataset_path_2d = self.data_config["GT_2D"]
@@ -43,6 +43,10 @@ class Data:
         else:
             self.normalize_pixel_2d_pose()
 
+        # calculate ori
+        print("-------------cal ori-------")
+        self.cal_ori()
+        print("-------------cal ori done-------")
         # sanity check
         self.sanity_check()
 
@@ -116,9 +120,10 @@ class Data:
                     anim = self.dataset[subject][action]
                     if "positions" in anim:
                         positions_3d = []
+                        ori_cam = []
                         for cam_idx, camera in enumerate(self.dataset.camera_info[subject]):
                             camera = self.dataset.camera_info[subject][cam_idx]
-                            positions_3d.append(camera.world2normalized(anim["positions"]))
+                            positions_3d.append(camera.world2camera(anim["positions"]))
                         anim["positions_3d"] = positions_3d
 
     def load_pixel_2d_pose(self, dataset_path):
@@ -370,3 +375,117 @@ class Data:
                     out_poses_3d[i] = out_poses_3d[i][::stride]
 
         return out_camera_params, out_poses_3d, out_poses_2d
+
+    def cal_ori(self):
+        """
+        Calculate target's orientation for each camera.
+        The orientation is defined as the chest facing direction, which is the cross product of the vector
+        from left shoulder to right shoulder and the vector of torso (from neck to hip center).
+        :return:
+        """
+        if self.gt_eval:
+            for subject in self.dataset.subjects():
+                for action in self.dataset[subject].keys():
+                    anim = self.dataset[subject][action]
+                    if "positions" in anim:
+                        positions_3d = []
+                        ori_each_cam = []
+                        for cam_idx, camera in enumerate(self.dataset.camera_info[subject]):
+                            camera = self.dataset.camera_info[subject][cam_idx]
+                            p3d_cam = camera.world2camera(anim["positions"])
+                            positions_3d.append(p3d_cam)
+
+                            # 提取关键点索引
+                            l_shoulder_idx = H36M_KEYPOINTS.index("LShoulder")
+                            r_shoulder_idx = H36M_KEYPOINTS.index("RShoulder")
+                            neck_idx = H36M_KEYPOINTS.index("Neck/Nose")
+                            l_hip_idx = H36M_KEYPOINTS.index("LHip")
+                            r_hip_idx = H36M_KEYPOINTS.index("RHip")
+
+                            # 批量提取关键点坐标
+                            # 假设p3d_cam形状为 [帧数, 关节数, 3]
+                            l_shoulder = p3d_cam[:, l_shoulder_idx]  # [帧数, 3]
+                            r_shoulder = p3d_cam[:, r_shoulder_idx]
+                            neck = p3d_cam[:, neck_idx]
+                            l_hip = p3d_cam[:, l_hip_idx]
+                            r_hip = p3d_cam[:, r_hip_idx]
+
+                            # 计算髋关节中心 (向量化)
+                            hip_center = (l_hip + r_hip) / 2  # [帧数, 3]
+
+                            # 计算肩膀向量和躯干向量 (向量化)
+                            shoulder_vector = l_shoulder - r_shoulder  # [帧数, 3]
+                            torso_vector = hip_center - neck  # [帧数, 3]
+
+                            # 计算叉乘 (向量化)
+                            chest_direction = np.cross(torso_vector, shoulder_vector)  # [帧数, 3]
+
+                            # 归一化向量 (向量化)
+                            norms = np.linalg.norm(chest_direction, axis=1, keepdims=True)  # [帧数, 1]
+                            valid_mask = norms > 1e-6  # 避免除以零
+
+                            # 修复：使用广播处理归一化
+                            chest_direction[valid_mask[:, 0]] /= norms[valid_mask[:, 0]]
+
+                            # 计算yaw角 (向量化)
+                            yaw = np.arctan2(chest_direction[:, 2], chest_direction[:, 0])  # [帧数]
+
+                            # 存储朝向信息
+                            ori_each_cam.append(yaw)
+
+                        anim["positions_3d"] = positions_3d
+                        anim["cam_ori"] = ori_each_cam
+
+    def cal_ori1(self):
+        """
+        Calculate target's orientation for each camera.
+        The orientation is defined as the chest facing direction, which is the cross product of the vector
+        from left shoulder to right shoulder and the vector of torso (from neck to hip center).
+        :return:
+        """
+        if self.gt_eval:
+            for subject in self.dataset.subjects():
+                for action in self.dataset[subject].keys():
+                    anim = self.dataset[subject][action]
+                    if "positions" in anim:
+                        positions_3d = []
+                        ori_each_cam = []
+                        for cam_idx, camera in enumerate(self.dataset.camera_info[subject]):
+                            camera = self.dataset.camera_info[subject][cam_idx]
+                            p3d_cam = camera.world2camera(anim["positions"])
+                            positions_3d.append(p3d_cam)
+
+                            # 计算每帧姿态在相机系下的朝向
+                            oris = []
+                            for pos_3d in p3d_cam:
+                                # 提取关键点坐标
+                                l_shoulder = pos_3d[H36M_KEYPOINTS.index("LShoulder")]  # 左肩膀
+                                r_shoulder = pos_3d[H36M_KEYPOINTS.index("RShoulder")]  # 右肩膀
+                                neck = pos_3d[H36M_KEYPOINTS.index("Neck/Nose")]  # 颈部
+                                hip_center = (
+                                    pos_3d[H36M_KEYPOINTS.index("LHip")] + pos_3d[H36M_KEYPOINTS.index("RHip")]
+                                ) / 2  # 髋关节中心
+
+                                # 计算左右肩膀向量
+                                shoulder_vector = r_shoulder - l_shoulder
+
+                                # 计算躯干向量 (颈部到髋关节中心)
+                                torso_vector = hip_center - neck
+
+                                # 计算叉乘 (得到胸部朝向向量)
+                                chest_direction = np.cross(shoulder_vector, torso_vector)
+
+                                # 归一化向量
+                                if np.linalg.norm(chest_direction) > 0:
+                                    chest_direction = chest_direction / np.linalg.norm(chest_direction)
+
+                                # 计算yaw角 (仅考虑水平方向旋转)
+                                # Yaw角定义为向量在XZ平面投影与Z轴的夹角
+                                yaw = np.arctan2(chest_direction[0], chest_direction[2])
+
+                                # 存储朝向信息
+                                oris.append(yaw)
+                            ori_each_cam.append(oris)
+
+                        anim["positions_3d"] = positions_3d
+                        anim["cam_ori"] = ori_each_cam
