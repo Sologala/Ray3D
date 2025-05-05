@@ -15,7 +15,9 @@ class TemporalModelBase(nn.Module):
     Do not instantiate this class.
     """
 
-    def __init__(self, num_joints_in, in_features, num_joints_out, filter_widths, causal, dropout, channels):
+    def __init__(
+        self, num_joints_in, in_features, num_joints_out, filter_widths, causal, dropout, channels, num_classes=8
+    ):
         super().__init__()
 
         # Validate input
@@ -33,35 +35,42 @@ class TemporalModelBase(nn.Module):
         self.pad = [filter_widths[0] // 2]
         self.expand_bn = nn.BatchNorm2d(channels, momentum=0.1)
         # self.shrink = nn.Conv2d(channels, num_joints_out * 3, 1)
-        self.num_classes = 8
+        self.num_classes = num_classes
 
-        self.coarse_classifier = nn.Sequential(
-            nn.Flatten(), nn.Linear(1024, 256), nn.ReLU(), nn.Linear(256, self.num_classes)
-        )
-        self.fine_regressor = nn.Sequential(
+        self.cls_head = nn.Sequential(nn.Flatten(), nn.Linear(1024, 256), nn.ReLU(), nn.Linear(256, self.num_classes))
+        self.reg_head = nn.Sequential(
             nn.Flatten(),
-            nn.Linear(1024 + self.num_classes, 256),
+            nn.Linear(1024, 256),
             nn.ReLU(),
             nn.Linear(256, 1),
             nn.Tanh(),
         )
 
-    def cls_and_reg(self, x):
-        coarse_logits = self.coarse_classifier(x)
-        coarse_probs = torch.softmax(coarse_logits, dim=1)
+    def cls_and_reg_no_concat(self, x):
+        # 分类输出
+        cls_logits = self.cls_head(x)
 
-        # 将粗分类的概率与输入特征拼接
-        combined_features = torch.cat([x.view(x.size(0), -1), coarse_probs], dim=1)
+        # 回归输出
+        reg_output = self.reg_head(x).squeeze(-1)  # (B,)
 
-        # 细回归
-        fine_angle = self.fine_regressor(combined_features)
+        return cls_logits, reg_output
 
-        # 将细回归的输出映射到具体的角度范围
-        class_width = 360 / self.num_classes
-        coarse_angle = torch.argmax(coarse_probs, dim=1, keepdim=True).float() * class_width
-        final_angle = coarse_angle + fine_angle * (class_width / 2)
-
-        return final_angle
+    # def cls_and_reg(self, x):
+    #     coarse_logits = self.cls_head(x)
+    #     coarse_probs = torch.softmax(coarse_logits, dim=1)
+    #
+    #     # 将粗分类的概率与输入特征拼接
+    #     combined_features = torch.cat([x.view(x.size(0), -1), coarse_probs], dim=1)
+    #
+    #     # 细回归
+    #     fine_angle = self.reg_head(combined_features)
+    #
+    #     # 将细回归的输出映射到具体的角度范围
+    #     class_width = 360 / self.num_classes
+    #     coarse_angle = torch.argmax(coarse_probs, dim=1, keepdim=True).float() * class_width
+    #     final_angle = coarse_angle + fine_angle * (class_width / 2)
+    #
+    #     return coarse_logits, final_angle
 
     def set_bn_momentum(self, momentum):
         self.expand_bn.momentum = momentum
@@ -91,9 +100,9 @@ class TemporalModelBase(nn.Module):
         return frames
 
     def forward(self, x):
-        print(x.shape)
-        print(self.in_features)
-        print(self.num_joints_in)
+        # print(x.shape)
+        # print(self.in_features)
+        # print(self.num_joints_in)
 
         assert len(x.shape) == 4
         assert x.shape[-2] == self.num_joints_in
@@ -106,8 +115,7 @@ class TemporalModelBase(nn.Module):
         x = x.unsqueeze(-1)
 
         x = self._forward_blocks(x)
-        ang = self.cls_and_reg(x)
-        return ang
+        return self.cls_and_reg_no_concat(x)
 
 
 class TemporalModel(TemporalModelBase):
@@ -126,6 +134,7 @@ class TemporalModel(TemporalModelBase):
         dropout=0.25,
         channels=1024,
         dense=False,
+        num_classes=8,
     ):
         """
         Initialize this model.
@@ -140,7 +149,9 @@ class TemporalModel(TemporalModelBase):
         channels -- number of convolution channels
         dense -- use regular dense convolutions instead of dilated convolutions (ablation experiment)
         """
-        super().__init__(num_joints_in, in_features, num_joints_out, filter_widths, causal, dropout, channels)
+        super().__init__(
+            num_joints_in, in_features, num_joints_out, filter_widths, causal, dropout, channels, num_classes=8
+        )
 
         self.expand_conv = nn.Conv2d(num_joints_in * in_features, channels, (filter_widths[0], 1), bias=False)
 
@@ -197,7 +208,15 @@ class TemporalModelOptimized1f(TemporalModelBase):
     """
 
     def __init__(
-        self, num_joints_in, in_features, num_joints_out, filter_widths, causal=False, dropout=0.25, channels=1024
+        self,
+        num_joints_in,
+        in_features,
+        num_joints_out,
+        filter_widths,
+        causal=False,
+        dropout=0.25,
+        channels=1024,
+        num_classes=8,
     ):
         """
         Initialize this model.
@@ -211,7 +230,9 @@ class TemporalModelOptimized1f(TemporalModelBase):
         dropout -- dropout probability
         channels -- number of convolution channels
         """
-        super().__init__(num_joints_in, in_features, num_joints_out, filter_widths, causal, dropout, channels)
+        super().__init__(
+            num_joints_in, in_features, num_joints_out, filter_widths, causal, dropout, channels, num_classes=8
+        )
 
         self.expand_conv = nn.Conv2d(
             num_joints_in * in_features, channels, (filter_widths[0], 1), stride=(filter_widths[0], 1), bias=False
@@ -259,7 +280,7 @@ if __name__ == "__main__":
     model = TemporalModel(17, 2, num_joints, filter_widths=filter_widths)
 
     input = torch.randn([512, receptive_field, 17, 2])
-    y = model(input)
+    out_cls, out_reg = model(input)
     end = time.time()
     print(end - start)
-    print(y.shape)
+    print(out_cls.shape, out_reg.shape)

@@ -107,10 +107,12 @@ def main():
     if action_filter is not None:
         mlog.info("Selected actions: {}".format(action_filter))
 
-    cameras_train, poses_train, poses_train_2d = pose_data.fetch_via_subject(
+    cameras_train, poses_train, poses_train_2d, poses_train_ori = pose_data.fetch_via_subject(
         subjects_train, action_filter, subset=data_config["SUBSET"]
     )
-    cameras_valid, poses_valid, poses_valid_2d = pose_data.fetch_via_subject(subjects_test, action_filter)
+    cameras_valid, poses_valid, poses_valid_2d, poses_valid_ori = pose_data.fetch_via_subject(
+        subjects_test, action_filter
+    )
 
     receptive_field = model_config["NUM_FRAMES"]
     mlog.info("INFO: Receptive field: {} frames".format(receptive_field))
@@ -126,6 +128,7 @@ def main():
         cameras_train,
         poses_train,
         poses_train_2d,
+        poses_train_ori,
         data_config["STRIDE"],
         pad=pad,
         causal_shift=causal_shift,
@@ -138,18 +141,37 @@ def main():
     )
     mlog.info("INFO: Training on {} frames".format(train_generator.num_frames()))
 
-    test_generator = UnchunkedGenerator(
+    # test_generator = UnchunkedGenerator(
+    #     cameras_valid,
+    #     poses_valid,
+    #     poses_valid_2d,
+    #     poses_valid_ori,
+    #     pad=pad,
+    #     causal_shift=causal_shift,
+    #     augment=False,
+    #     kps_left=kps_left,
+    #     kps_right=kps_right,
+    #     joints_left=joints_left,
+    #     joints_right=joints_right,
+    # )
+
+    test_generator = ChunkedGenerator(
+        train_config["BATCH_SIZE"] // data_config["STRIDE"],
         cameras_valid,
         poses_valid,
         poses_valid_2d,
+        poses_valid_ori,
+        data_config["STRIDE"],
         pad=pad,
         causal_shift=causal_shift,
+        shuffle=True,
         augment=False,
         kps_left=kps_left,
         kps_right=kps_right,
         joints_left=joints_left,
         joints_right=joints_right,
     )
+
     mlog.info("INFO: Testing on {} frames".format(test_generator.num_frames()))
 
     """-------- model --------"""
@@ -247,10 +269,12 @@ def main():
 
         while epoch <= train_config["EPOCHS"]:
             start_time = time()
+            current_lr = 0
+            losses_ori_train = 0
 
-            losses_3d_train, current_lr = trainval_engine.train(epoch, mlog)
+            losses_ori_train, current_lr = trainval_engine.train(epoch, mlog)
 
-            losses_3d_eval = trainval_engine.test(epoch, mlog)
+            losses_ori_eval = trainval_engine.test(epoch, mlog)
 
             if epoch % 16 == 0:
                 trainval_engine.evaluate(
@@ -263,8 +287,8 @@ def main():
             elapsed = (time() - start_time) / 60
 
             mlog.info(
-                "[%d] time %.2f lr %f 3d_train %f 3d_eval %f "
-                % (epoch, elapsed, current_lr, losses_3d_train * 1000, losses_3d_eval * 1000)
+                "[%d] time %.2fmin lr %f ori_train %f ori_eval %f "
+                % (epoch, elapsed, current_lr, losses_ori_train, losses_ori_eval)
             )
             epoch += 1
 

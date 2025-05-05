@@ -29,6 +29,7 @@ class ChunkedGenerator:
         cameras,
         poses_3d,
         poses_2d,
+        poses_ori,
         chunk_length,
         pad=0,
         causal_shift=0,
@@ -41,8 +42,8 @@ class ChunkedGenerator:
         joints_right=None,
         endless=False,
     ):
-        assert poses_3d is None or len(poses_3d) == len(poses_2d), (len(poses_3d), len(poses_2d))
-        assert cameras is None or len(cameras) == len(poses_2d)
+        assert poses_3d is None or len(poses_3d) == len(poses_2d) == len(poses_ori), (len(poses_3d), len(poses_2d))
+        assert cameras is None or len(cameras) == len(poses_2d) == len(poses_ori)
 
         # Build lineage info
         pairs = []  # (seq_idx, start_frame, end_frame, flip) tuples
@@ -58,6 +59,10 @@ class ChunkedGenerator:
         # Initialize buffers
         if poses_3d is not None:
             self.batch_3d = np.empty((batch_size, chunk_length, poses_3d[0].shape[-2], poses_3d[0].shape[-1]))
+
+        if poses_ori is not None:
+            self.batch_ori = np.empty((batch_size, chunk_length, 1))
+
         self.batch_2d = np.empty((batch_size, chunk_length + 2 * pad, poses_2d[0].shape[-2], poses_2d[0].shape[-1]))
 
         self.num_batches = (len(pairs) + batch_size - 1) // batch_size
@@ -73,6 +78,7 @@ class ChunkedGenerator:
         self.cameras = cameras
         self.poses_3d = poses_3d
         self.poses_2d = poses_2d
+        self.poses_ori = poses_ori
 
         self.augment = augment
         self.kps_left = kps_left
@@ -152,17 +158,36 @@ class ChunkedGenerator:
                             self.batch_3d[i, :, self.joints_left + self.joints_right] = self.batch_3d[
                                 i, :, self.joints_right + self.joints_left
                             ]
+                    # ori
+                    if self.poses_ori is not None:
+                        seq_ori = self.poses_ori[seq_i]
+                        low_3d = max(start_3d, 0)
+                        high_3d = min(end_3d, seq_ori.shape[0])
+                        pad_left_3d = low_3d - start_3d
+                        pad_right_3d = end_3d - high_3d
+                        if pad_left_3d != 0 or pad_right_3d != 0:
+                            self.batch_ori[i] = np.pad(
+                                seq_ori[low_3d:high_3d], ((pad_left_3d, pad_right_3d), (0, 0), (0, 0)), "edge"
+                            )
+                        else:
+                            self.batch_ori[i] = seq_ori[low_3d:high_3d]
+
+                        if flip:
+                            # Flip 3D joints
+                            self.batch_ori[i, :, 0] = (self.batch_ori[i, :, 0] + np.pi) % (
+                                2 * np.pi
+                            )
 
                 if self.endless:
                     self.state = (b_i + 1, pairs)
                 if self.poses_3d is None and self.cameras is None:
-                    yield None, None, self.batch_2d[: len(chunks)]
+                    yield None, None, self.batch_2d[: len(chunks)], self.batch_ori[ : len(chunks) ]
                 elif self.poses_3d is not None and self.cameras is None:
-                    yield None, self.batch_3d[: len(chunks)], self.batch_2d[: len(chunks)]
+                    yield None, self.batch_3d[: len(chunks)], self.batch_2d[: len(chunks)], self.batch_ori[ : len(chunks) ]
                 elif self.poses_3d is None:
-                    yield None, None, self.batch_2d[: len(chunks)]
+                    yield None, None, self.batch_2d[: len(chunks)], self.batch_ori[ : len(chunks) ]
                 else:
-                    yield None, self.batch_3d[: len(chunks)], self.batch_2d[: len(chunks)]
+                    yield None, self.batch_3d[: len(chunks)], self.batch_2d[: len(chunks)], self.batch_ori[ : len(chunks) ]
 
             if self.endless:
                 self.state = None
@@ -194,6 +219,7 @@ class UnchunkedGenerator:
         cameras,
         poses_3d,
         poses_2d,
+        poses_ori,
         pad=0,
         causal_shift=0,
         augment=False,
@@ -202,8 +228,8 @@ class UnchunkedGenerator:
         joints_left=None,
         joints_right=None,
     ):
-        assert poses_3d is None or len(poses_3d) == len(poses_2d)
-        assert cameras is None or len(cameras) == len(poses_2d)
+        assert poses_3d is None or len(poses_3d) == len(poses_2d) == len(poses_ori)
+        assert cameras is None or len(cameras) == len(poses_2d) == len(poses_ori)
 
         self.augment = augment
         self.kps_left = kps_left
@@ -216,6 +242,7 @@ class UnchunkedGenerator:
         self.cameras = [] if cameras is None else cameras
         self.poses_3d = [] if poses_3d is None else poses_3d
         self.poses_2d = poses_2d
+        self.poses_ori = poses_ori
 
     def num_frames(self):
         count = 0
@@ -230,11 +257,15 @@ class UnchunkedGenerator:
         self.augment = augment
 
     def next_epoch(self):
-        for seq_cam, seq_3d, seq_2d in zip_longest(self.cameras, self.poses_3d, self.poses_2d):
+        for seq_cam, seq_3d, seq_2d, seq_ori in zip_longest(self.cameras, self.poses_3d, self.poses_2d, self.poses_ori):
             batch_cam = seq_cam
             batch_3d = None if seq_3d is None else np.expand_dims(seq_3d, axis=0)
             batch_2d = np.expand_dims(
                 np.pad(seq_2d, ((self.pad + self.causal_shift, self.pad - self.causal_shift), (0, 0), (0, 0)), "edge"),
+                axis=0,
+            )
+            batch_ori = np.expand_dims(
+                np.pad(seq_ori, (self.pad + self.causal_shift, self.pad - self.causal_shift), "edge"),
                 axis=0,
             )
             if self.augment:
@@ -255,4 +286,8 @@ class UnchunkedGenerator:
                 batch_2d[1, :, :, 0] *= -1
                 batch_2d[1, :, self.kps_left + self.kps_right] = batch_2d[1, :, self.kps_right + self.kps_left]
 
-            yield batch_cam, batch_3d, batch_2d
+                if batch_ori is not None:
+                    batch_ori = np.concatenate((batch_ori, batch_ori), axis=0)
+                    batch_ori[1, :, 0] = (batch_ori[1, :, 0] + np.pi) % (2 * np.pi)
+
+            yield batch_cam, batch_3d, batch_2d, batch_ori

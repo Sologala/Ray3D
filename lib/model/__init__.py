@@ -8,7 +8,7 @@ class Model(object):
 
         trj_model = None
 
-        if model_config["MODEL"] == "VideoPose3D":
+        if model_config["MODEL"] == "videoOri":
             # from lib.model.videopose3D import TemporalModel, TemporalModelOptimized1f
             from lib.model.videoOri import TemporalModel, TemporalModelOptimized1f
 
@@ -30,6 +30,7 @@ class Model(object):
                     causal=model_config["CAUSAL"],
                     dropout=model_config["DROPOUT"],
                     channels=model_config["CHANNELS"],
+                    num_classes=model_config["NUM_COARSE_ANG"],
                 )
                 if model_config["TRAJECTORY_MODEL"]:
                     trj_model = TemporalModelOptimized1f(
@@ -40,6 +41,7 @@ class Model(object):
                         causal=model_config["CAUSAL"],
                         dropout=model_config["DROPOUT"],
                         channels=model_config["CHANNELS"],
+                        num_classes=model_config["NUM_COARSE_ANG"],
                     )
             else:
                 pos_model = TemporalModel(
@@ -51,6 +53,7 @@ class Model(object):
                     dropout=model_config["DROPOUT"],
                     channels=model_config["CHANNELS"],
                     dense=model_config["DENSE"],
+                    num_classes=model_config["NUM_COARSE_ANG"],
                 )
                 if model_config["TRAJECTORY_MODEL"]:
                     trj_model = TemporalModel(
@@ -62,6 +65,7 @@ class Model(object):
                         dropout=model_config["DROPOUT"],
                         channels=model_config["CHANNELS"],
                         dense=model_config["DENSE"],
+                        num_classes=model_config["NUM_COARSE_ANG"],
                     )
 
         else:

@@ -305,16 +305,19 @@ class Data:
         """
         out_poses_3d = []
         out_poses_2d = []
+        out_poses_ori = []
         out_camera_params = []
 
         for subject in subjects:
             for action in self.keypoints[subject].keys():
                 poses_2d = self.keypoints[subject][action]
                 poses_3d = self.dataset[subject][action]["positions_3d"]
-                assert len(poses_3d) == len(poses_2d), "Camera count mismatch"
+                poses_ori = self.dataset[subject][action]["cam_ori"]
+                assert len(poses_3d) == len(poses_2d) == len(poses_ori), "Camera count mismatch"
                 for i in range(len(poses_2d)):  # Iterate across cameras
                     out_poses_2d.append(copy.deepcopy(poses_2d[i]))
                     out_poses_3d.append(copy.deepcopy(poses_3d[i]))
+                    out_poses_ori.append(copy.deepcopy(poses_ori[i]))
 
         if len(out_camera_params) == 0:
             out_camera_params = None
@@ -336,7 +339,7 @@ class Data:
                 if out_poses_3d is not None:
                     out_poses_3d[i] = out_poses_3d[i][::stride]
 
-        return out_camera_params, out_poses_3d, out_poses_2d
+        return out_camera_params, out_poses_3d, out_poses_2d, out_poses_ori
 
     def fetch_via_action(self, actions, camera_idx=None):
         """
@@ -346,18 +349,21 @@ class Data:
         """
         out_poses_3d = []
         out_poses_2d = []
+        out_poses_ori = []
         out_camera_params = []
 
         for subject, action in actions:
             poses_2d = self.keypoints[subject][action]
             poses_3d = self.dataset[subject][action]["positions_3d"]
-            assert len(poses_3d) == len(poses_2d), "Camera count mismatch"
+            poses_ori = self.dataset[subject][action]["cam_ori"]
+            assert len(poses_3d) == len(poses_2d) == len(poses_ori), "Camera count mismatch"
             for i in range(len(poses_2d)):  # Iterate across cameras
                 if camera_idx is not None:
                     if i != camera_idx:
                         continue
                 out_poses_2d.append(copy.deepcopy(poses_2d[i]))
                 out_poses_3d.append(copy.deepcopy(poses_3d[i]))
+                out_poses_ori.append(copy.deepcopy(poses_ori[i]))
                 camera = self.dataset.camera_info[subject][i]
                 out_camera_params.append(camera)
 
@@ -374,7 +380,7 @@ class Data:
                 if out_poses_3d is not None:
                     out_poses_3d[i] = out_poses_3d[i][::stride]
 
-        return out_camera_params, out_poses_3d, out_poses_2d
+        return out_camera_params, out_poses_3d, out_poses_2d, out_poses_ori
 
     def cal_ori(self):
         """

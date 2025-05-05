@@ -30,16 +30,17 @@ data_config = {
 
 model_config = {
     # method to calculate 3D pose
-    "MODEL": "VideoPose3D",  # VideoPose3D, PoseFormer
+    "MODEL": "videoOri",  # VideoPose3D, PoseFormer
+    "NUM_COARSE_ANG": 8,
     # initialize trajectory model
     "TRAJECTORY_MODEL": True,
     "BONE_COMPARISON": False,
     # number for layers
-    "ARCHITECTURE": "3,3",
+    "ARCHITECTURE": "3,3,3,3",
     # dropout probability
     "DROPOUT": 0.25,
     # how many frames used as input
-    "NUM_FRAMES": 9,
+    "NUM_FRAMES": 81,
     # use causal convolutions for real-time processing
     "CAUSAL": False,
     # number of channels in convolution layers
@@ -57,10 +58,11 @@ model_config = {
 train_config = {
     # number of training epochs
     "EPOCHS": 256,
+    # "EPOCHS": 1,
     # batch size in terms of predicted frames
     "BATCH_SIZE": 128,
     # initial learning rate
-    "LEARNING_RATE": 1e-3,
+    "LEARNING_RATE": 0.25 * 1e-3,
     # learning rate decay per epoch
     "LR_DECAY": 0.99,
     # optimizer

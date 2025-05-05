@@ -7,6 +7,8 @@
 
 import torch
 import numpy as np
+import torch.nn as nn
+import torch.nn.functional as F
 
 
 def mpjpe(predicted, target):
@@ -102,3 +104,80 @@ def mean_velocity_error(predicted, target):
     velocity_target = np.diff(target, axis=0)
 
     return np.mean(np.linalg.norm(velocity_predicted - velocity_target, axis=len(target.shape) - 1))
+
+
+class AngleLoss(nn.Module):
+    def __init__(self, num_bins=8, alpha=1.0):
+        super(AngleLoss, self).__init__()
+        self.num_bins = num_bins
+        self.alpha = alpha
+        self.cls_criterion = nn.CrossEntropyLoss()
+
+    def _compute_bin_and_target(self, gt_angle):
+        """
+        将真实角度转换为 bin 索引和归一化偏移量
+        :param gt_angle: (B,) 张量，表示真实角度，范围 [0, 360)
+        :return: bin_indices (B,) 整型张量，reg_targets (B,) 浮点张量
+        """
+        B = gt_angle.size(0)
+        bin_width = 360.0 / self.num_bins
+        bin_width_half = bin_width / 2.0
+
+        # 计算 bin 索引
+        shifted_angle = (gt_angle + bin_width_half) % 360.0
+        bin_indices = (shifted_angle // bin_width).long()
+        bin_indices = bin_indices % self.num_bins  # 确保索引在有效范围内
+        
+        # 确保 bin_indices 是一维张量 [B]
+        bin_indices = bin_indices.squeeze()
+        if bin_indices.dim() != 1:
+            bin_indices = bin_indices.view(-1)
+
+        # 计算 bin 中心
+        bin_centers = bin_indices.float() * bin_width
+
+        # 计算最小有符号角度差
+        delta_angle = (gt_angle - bin_centers + 180.0) % 360.0 - 180.0
+
+        # 归一化偏移量
+        reg_targets = delta_angle / bin_width_half
+        
+        # 确保 reg_targets 是一维张量 [B]
+        reg_targets = reg_targets.squeeze()
+        if reg_targets.dim() != 1:
+            reg_targets = reg_targets.view(-1)
+
+        return bin_indices, reg_targets
+
+    def forward(self, logits, reg_output, gt_angle):
+        """
+        :param logits: (B, num_bins) 分类输出
+        :param reg_output: (B,) 回归输出
+        :param gt_angle: (B,) 真实角度，范围 [0, 360)
+        :return: 总损失
+        """
+        # 确保输入的 gt_angle 是一维张量
+        if gt_angle.dim() > 1:
+            gt_angle = gt_angle.squeeze()
+            if gt_angle.dim() != 1:
+                raise ValueError(f"gt_angle should be 1D tensor, got shape {gt_angle.shape}")
+        
+        # 获取 bin 索引和归一化偏移量
+        bin_indices, reg_targets = self._compute_bin_and_target(gt_angle)
+
+        # 验证维度
+        assert bin_indices.dim() == 1, f"bin_indices should be 1D, got {bin_indices.dim()}D"
+        assert logits.size(0) == bin_indices.size(0), f"Batch size mismatch: {logits.size(0)} vs {bin_indices.size(0)}"
+        
+        # 分类损失
+        loss_cls = self.cls_criterion(logits, bin_indices)
+
+        # 回归损失
+        reg_output = reg_output.view(-1)
+        reg_targets = reg_targets.detach()  # 不需要梯度
+        loss_reg = F.smooth_l1_loss(reg_output, reg_targets)
+
+        # 总损失
+        total_loss = loss_cls + self.alpha * loss_reg
+
+        return total_loss
