@@ -276,8 +276,8 @@ class Trainer:
                     )
                     shutil.copy(chk_path, best_chk_path)
 
-                cmd = "rm {}".format(chk_path)
-                os.system(cmd)
+                # cmd = "rm {}".format(chk_path)
+                # os.system(cmd)
 
             # Decay learning rate exponentially
             self.lr *= self.train_config["LR_DECAY"]
