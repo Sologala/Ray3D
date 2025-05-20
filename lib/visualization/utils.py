@@ -91,7 +91,7 @@ def create_kps_animation(kps_sequence: np.ndarray, fps=10, width=416, height=416
     
     return ani
 
-def draw_orientation(image, yaw_ang_rad, cam_idx=0, title=None, 
+def draw_orientation(image, yaw_ang_rad, conf, cam_idx=0, title=None, 
                      canvas_size=(416, 416), arrow_color=(0, 0, 255), 
                      text_color=(0, 0, 0)):
     """
@@ -156,7 +156,7 @@ def draw_orientation(image, yaw_ang_rad, cam_idx=0, title=None,
                    cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 0, 0), 2, cv2.LINE_AA)
     
     # 添加相机索引
-    cv2.putText(image, f"Camera {cam_idx}", (width - 120, height - 20), 
+    cv2.putText(image, f"conf: {conf}", (width - 120, height - 20), 
                cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 0, 0), 1, cv2.LINE_AA)
     
     return image

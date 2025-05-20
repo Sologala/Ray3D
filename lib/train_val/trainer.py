@@ -25,6 +25,7 @@ def postprocess_angle(cls_logits, reg_output, num_bins=8):
 
     # 分类概率
     cls_probs = F.softmax(cls_logits, dim=1)
+    # print(cls_logits)
     bin_indices = cls_probs.argmax(dim=1).float()
 
     # 计算 bin 中心角度
@@ -37,7 +38,7 @@ def postprocess_angle(cls_logits, reg_output, num_bins=8):
     final_angles = bin_centers + reg_offset
     final_angles = final_angles % 360.0  # 确保在 [0, 360)
 
-    return final_angles
+    return final_angles, cls_probs.max()
 
 
 class Trainer:
@@ -168,7 +169,7 @@ class Trainer:
 
             if iter % 5000 == 0:
                 print(f"iter {iter}, total_loss {total_loss}")
-                final_angles = postprocess_angle(out_cls, out_reg, self.num_class)
+                final_angles, conf = postprocess_angle(out_cls, out_reg, self.num_class)
                 delta_angle = (inputs_ori - final_angles + 180.0) % 360.0 - 180.0
                 print(delta_angle)
             iter += 1
@@ -221,7 +222,7 @@ class Trainer:
                     inputs_3d[:, :, 0] = 0
 
                 out_cls, out_reg = self.pos_model_test(inputs_2d)
-                final_angles = postprocess_angle(out_cls, out_reg, self.num_class)
+                final_angles, conf = postprocess_angle(out_cls, out_reg, self.num_class)
                 delta_angle = (inputs_ori.squeeze() - final_angles + 180.0) % 360.0 - 180.0
                 all_ang_diff.append(delta_angle.cpu())
 
@@ -324,7 +325,7 @@ class Trainer:
 
                 out_cls, out_reg = self.pos_model_test(inputs_2d)
 
-                final_angles = postprocess_angle(out_cls, out_reg, self.num_class)
+                final_angles, conf = postprocess_angle(out_cls, out_reg, self.num_class)
                 delta_angle = (inputs_ori.squeeze() - final_angles + 180.0) % 360.0 - 180.0
                 all_ang_diff.append(delta_angle.cpu())
 

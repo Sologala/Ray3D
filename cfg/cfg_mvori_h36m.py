@@ -60,9 +60,9 @@ train_config = {
     "EPOCHS": 256,
     # "EPOCHS": 1,
     # batch size in terms of predicted frames
-    "BATCH_SIZE": 128,
+    "BATCH_SIZE": 256,
     # initial learning rate
-    "LEARNING_RATE": 0.25 * 1e-3,
+    "LEARNING_RATE": 1.0 * 1e-3,
     # learning rate decay per epoch
     "LR_DECAY": 0.99,
     # optimizer
@@ -70,7 +70,7 @@ train_config = {
     "INITIAL_MOMENTUM": 0.01,
     "FINAL_MOMENTUM": 0.001,
     # train-time flipping
-    "TRAIN_TIME_AUGMENTATION": True,
+    "TRAIN_TIME_AUGMENTATION": False,
     # terst-time flipping
     "TEST_TIME_AUGMENTATION": False,  # always set it as False
     # DEVICE ID
