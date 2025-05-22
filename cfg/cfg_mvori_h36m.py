@@ -31,7 +31,7 @@ data_config = {
 model_config = {
     # method to calculate 3D pose
     "MODEL": "videoOri",  # VideoPose3D, PoseFormer
-    "NUM_COARSE_ANG": 8,
+    "NUM_COARSE_ANG": 16,
     # initialize trajectory model
     "TRAJECTORY_MODEL": True,
     "BONE_COMPARISON": False,

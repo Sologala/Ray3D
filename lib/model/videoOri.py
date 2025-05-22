@@ -150,7 +150,7 @@ class TemporalModel(TemporalModelBase):
         dense -- use regular dense convolutions instead of dilated convolutions (ablation experiment)
         """
         super().__init__(
-            num_joints_in, in_features, num_joints_out, filter_widths, causal, dropout, channels, num_classes=8
+            num_joints_in, in_features, num_joints_out, filter_widths, causal, dropout, channels, num_classes=num_classes
         )
 
         self.expand_conv = nn.Conv2d(num_joints_in * in_features, channels, (filter_widths[0], 1), bias=False)
@@ -231,7 +231,7 @@ class TemporalModelOptimized1f(TemporalModelBase):
         channels -- number of convolution channels
         """
         super().__init__(
-            num_joints_in, in_features, num_joints_out, filter_widths, causal, dropout, channels, num_classes=8
+            num_joints_in, in_features, num_joints_out, filter_widths, causal, dropout, channels, num_classes=num_classes
         )
 
         self.expand_conv = nn.Conv2d(

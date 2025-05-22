@@ -435,7 +435,8 @@ class Data:
 
                             # 计算yaw角 (向量化)
                             yaw = np.arctan2(chest_direction[:, 2], chest_direction[:, 0])  # [帧数]
-
+                            yaw[yaw < 0] += np.pi * 2
+                            yaw = np.rad2deg(yaw)
                             # 存储朝向信息
                             ori_each_cam.append(yaw)
 

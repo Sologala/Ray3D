@@ -91,7 +91,7 @@ class Trainer:
         self.plotter = plotter
 
         self.num_class = model_config["NUM_COARSE_ANG"]
-        self.loss = AngleLoss(self.num_class, 1.0)
+        self.loss = AngleLoss(self.num_class, 0.2)
 
     @staticmethod
     def eval_data_prepare(receptive_field, inputs_2d, inputs_3d, inputs_ori):
@@ -145,15 +145,6 @@ class Trainer:
             epoch_loss_ori_train += loss_ori.item()
             total_loss = loss_ori
 
-            # if self.model_config["TRAJECTORY_MODEL"]:
-            #     predicted_3d_trj = self.trj_model_train(inputs_2d)
-            #     w = torch.abs(1 / inputs_traj[:, :, :, 2])  # Weight inversely proportional to depth
-            #     loss_3d_traj = weighted_mpjpe(predicted_3d_trj, inputs_traj, w)
-            #     assert inputs_traj.shape[0] * inputs_traj.shape[1] == inputs_3d.shape[0] * inputs_3d.shape[1]
-            #     epoch_loss_3d_train += inputs_3d.shape[0] * inputs_3d.shape[1] * loss_3d_traj.item()
-            #     epoch_loss_3d_trj += inputs_3d.shape[0] * inputs_3d.shape[1] * loss_3d_traj.item()
-            #     total_loss += loss_3d_traj
-
             # ---------------- visualization ---------------- #
             # if iter % 2048 == 0 and self.plotter is not None and epoch % 64 == 0:
             #     self.plotter.show_plot(
@@ -170,8 +161,11 @@ class Trainer:
             if iter % 5000 == 0:
                 print(f"iter {iter}, total_loss {total_loss}")
                 final_angles, conf = postprocess_angle(out_cls, out_reg, self.num_class)
-                delta_angle = (inputs_ori - final_angles + 180.0) % 360.0 - 180.0
-                print(delta_angle)
+                print("pred:", final_angles.cpu().detach().numpy().squeeze().flatten()[:10])
+                print("gt:", inputs_ori.cpu().detach().numpy().squeeze().flatten()[:10])
+                # print(final_angles)
+                # delta_angle = (inputs_ori - final_angles + 180.0) % 360.0 - 180.0
+                # print(delta_angle)
             iter += 1
             total_loss.backward()
             self.optimizer.step()

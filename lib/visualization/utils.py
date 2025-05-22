@@ -91,7 +91,59 @@ def create_kps_animation(kps_sequence: np.ndarray, fps=10, width=416, height=416
     
     return ani
 
-def draw_orientation(image, yaw_ang_rad, conf, cam_idx=0, title=None, 
+import numpy as np
+import matplotlib.pyplot as plt
+from matplotlib.animation import FuncAnimation
+import cv2
+from matplotlib.animation import PillowWriter
+
+def save_kps_gif(kps_sequence: np.ndarray,save_path,  fps=10, width=416, height=416):
+    """
+    将关键点序列生成动画并保存为GIF或显示
+    
+    参数:
+        kps_sequence: 关键点序列，形状为 (batch=1, frames, points=17, dim=2) 或 (frames, points=17, dim=2)
+        fps: 动画帧率
+        width, height: 图像尺寸
+        save_path: GIF保存路径，若为None则不保存
+        show: 是否显示动画
+    
+    返回:
+        matplotlib.animation.FuncAnimation 对象
+    """
+    # 去除batch维度
+    if kps_sequence.ndim == 4 and kps_sequence.shape[0] == 1:
+        kps_sequence = kps_sequence[0]  # 形状变为 (frames, 17, 2)
+    
+    num_frames = kps_sequence.shape[0]
+    
+    # 创建画布
+    fig, ax = plt.subplots(figsize=(6, 6))
+    ax.set_axis_off()
+    
+    # 初始化图像
+    img = draw_kps_to_image(kps_sequence[0], width, height)
+    im = ax.imshow(img)
+    
+    # 更新函数
+    def update(frame):
+        img = draw_kps_to_image(kps_sequence[frame], width, height)
+        cv2.putText(img, f'Frame {frame+1}/{num_frames}', 
+                   (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 255, 255), 2)
+        im.set_array(img)
+        return [im]
+    
+    # 创建动画
+    ani = FuncAnimation(fig, update, frames=num_frames, interval=1000/fps, blit=True)
+    
+    # 保存GIF
+    if save_path:
+        writer = PillowWriter(fps=fps)
+        ani.save(save_path, writer=writer)
+        print(f"GIF saved to {save_path}")
+
+
+def draw_orientation(image, yaw_ang_deg, conf, cam_idx=0, title=None, 
                      canvas_size=(416, 416), arrow_color=(0, 0, 255), 
                      text_color=(0, 0, 0)):
     """
@@ -119,9 +171,9 @@ def draw_orientation(image, yaw_ang_rad, conf, cam_idx=0, title=None,
     radius = min(width, height) * 0.4  # 箭头长度
     
     # 计算箭头终点坐标
-    yaw_degrees = np.degrees(yaw_ang_rad) % 360
-    end_x = int(center_x + radius * np.cos(yaw_ang_rad))
-    end_y = int(center_y + radius * np.sin(yaw_ang_rad))
+    yaw_rad = np.deg2rad(yaw_ang_deg) 
+    end_x = int(center_x + radius * np.cos(yaw_rad))
+    end_y = int(center_y + radius * np.sin(yaw_rad))
     
     # 绘制箭头
     image = cv2.arrowedLine(
@@ -135,10 +187,10 @@ def draw_orientation(image, yaw_ang_rad, conf, cam_idx=0, title=None,
     )
     
     # 绘制角度文本
-    text = f"{yaw_degrees:.1f}"
+    text = f"{yaw_ang_deg:.1f}"
     text_size, _ = cv2.getTextSize(text, cv2.FONT_HERSHEY_SIMPLEX, 0.7, 2)
-    text_x = int(center_x + radius * 0.7 * np.cos(yaw_ang_rad))
-    text_y = int(center_y + radius * 0.7 * np.sin(yaw_ang_rad))
+    text_x = int(center_x + radius * 0.7 * np.cos(yaw_rad))
+    text_y = int(center_y + radius * 0.7 * np.sin(yaw_rad))
     
     # 添加文本背景
     text_bg_x1, text_bg_y1 = text_x - text_size[0] // 2 - 10, text_y - text_size[1] // 2 - 10
