@@ -1,0 +1,15 @@
+[project]
+name = "ray3d"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.8"
+dependencies = [
+    "matplotlib>=3.7.5",
+    "numpy>=1.24.4",
+    "opencv-python>=4.11.0.86",
+    "torch==1.13.1",
+    "torchaudio==0.13.1",
+    "torchvision==0.14.1",
+    "visdom>=0.2.4",
+]
